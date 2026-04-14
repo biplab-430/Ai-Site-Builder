@@ -72,7 +72,7 @@ const Navbar = () => {
         </nav>
            {/* Mobile Menu */}
         {menuOpen && (
-          <div className="fixed inset-0 z-[100] bg-black/60 text-white backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-300">
+          <div className="fixed inset-0 z-100 bg-black/60 text-white backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-300">
             <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
             <Link to="/projects" onClick={() => setMenuOpen(false)}>My Projects</Link>
             <Link to="/community" onClick={() => setMenuOpen(false)}>Community</Link>

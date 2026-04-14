@@ -41,7 +41,7 @@ const MyProjects: React.FC = () => {
             <button
               onClick={() => navigate("/")}
               className="flex items-center gap-2 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded
-              bg-gradient-to-br from-indigo-500 to-indigo-600
+              bg-linear-to-br from-indigo-500 to-indigo-600
               hover:opacity-90 active:scale-95 transition-all"
             >
               <PlusIcon size={18} />
@@ -70,8 +70,12 @@ const MyProjects: React.FC = () => {
                       style={{ transform: "scale(0.25)" }}
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                      No Preview Available
+                    <div className="flex flex-col items-center justify-center h-[80vh]">
+                    <h1 className="text-3xl font-semibold text-gray-300">YOU have no Projects Yet</h1>
+                      <button onClick={()=>navigate('/')}
+                       className="text-white px-5 py-2 rounded-md bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all">
+                        Create New Project
+                      </button>
                     </div>
                   )}
                 </div>
