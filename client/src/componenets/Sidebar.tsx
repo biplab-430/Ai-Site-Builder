@@ -11,8 +11,11 @@ interface SidebarProps {
     isGenerating: boolean;
     setIsGenerating: (isGenerating: boolean) => void;
 }
-const Sidebar = ({ isMenuOpen, project, setProject, isGenerating, setIsGenerating }: SidebarProps) => {
+const Sidebar = ({ isMenuOpen, project, setProject, isGenerating, setIsGenerating }: 
+    SidebarProps) => {
+
     const messageRef=useRef<HTMLDivElement>(null);
+
     const [input,setInput]=useState('')
 
    const handleRollBack= async(versionId: string)=>{
@@ -20,6 +23,7 @@ const Sidebar = ({ isMenuOpen, project, setProject, isGenerating, setIsGeneratin
    }
 
    const handleRevision=async(e:React.FormEvent)=>{
+    
 e.preventDefault()
 setIsGenerating(true)
 setTimeout(() => {
@@ -32,10 +36,11 @@ setTimeout(() => {
         messageRef.current.scrollIntoView({behavior:'smooth'})
      }
     },[project.conversation.length,isGenerating])
+
     return (
         <div className={`h-full sm:max-w-sm rounded-xl bg-gray-900 border-gray-800 transition-all ${isMenuOpen ? 'max-sm:w-0 overflow-hidden ' : 'w-full'} `}>
             <div className="flex flex-col h-full">
-                {/* message controller */}
+                {/* message container */}
                 <div className='flex-1 overflow-y-auto no-scrollbar px-3 flex flex-col gap-4 '>
                     {[...project.conversation, ...project.versions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((message) => {
                         const isMessage = 'content' in message;

@@ -36,7 +36,6 @@ const Community = () => {
           <div className="flex items-center justify-between mb-12">
             <h1 className="text-2xl font-medium text-white">Published Projects</h1>
 
-           
           </div>
 
           {/* Projects Grid */}

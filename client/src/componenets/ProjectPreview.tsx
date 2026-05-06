@@ -1,4 +1,4 @@
-import React, {
+import  {
   forwardRef,
   useEffect,
   useRef,
@@ -25,13 +25,19 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
   ({ project, isGenerating, device = 'desktop', showEditorPanel = true }, ref) => {
 
     const iframeRef = useRef<HTMLIFrameElement>(null);
+
+
     const [selectedElement, setSelectedElement] = useState<any>(null);
 
     const injectPreview = (html: string) => {
-      if (!html || !showEditorPanel) return html;
-      return html.includes('</body>')
-        ? html.replace('</body>', iframeScript + '</body>')
-        : html + iframeScript;
+      if(!html) return '';
+      if(!showEditorPanel) return html;
+      if(html.includes('</body>')){
+        return html.replace('</body>',iframeScript + '</body>')
+      }else{
+        return html + iframeScript;
+      }
+       
     };
 
     const resolutions = {
@@ -40,26 +46,38 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
       desktop: 'w-full',
     };
 
+
+
     useImperativeHandle(ref, () => ({
       getcode: () =>{
         const doc=iframeRef.current?.contentDocument;
         if(!doc) return undefined;
+
+        //REMOVE SELECTION 
+
         doc.querySelectorAll('.ai-selected-element,[data-ai-selected]').forEach((el)=>{
           el.classList.remove('ai-selected-element')
         el.removeAttribute('data-ai-selected');
-          (el as HTMLElement).style.outline='none';
+          (el as HTMLElement).style.outline='';
         
       })
+
+       //REMOVE STYLE 
+
       const previewStyle=doc.getElementById('ai-preview-style');
       if(previewStyle) previewStyle.remove();
-      const  previewScript=doc.getElementById('ai-preview-style')
+      const  previewScript=doc.getElementById('ai-preview-script');
       if(previewScript) previewScript.remove();
+
+      //clean html
 
       const html=doc.documentElement.outerHTML;
       return html;
 
       }
     }));
+
+
 
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
@@ -75,10 +93,10 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
     }, []);
 
     // ✅ Define update handler (adjust logic as needed)
-    const handleUpdate = (updatedStyles: any) => {
+  const handleUpdate = (updateS: any) => {
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage(
-          { type: 'UPDATE_ELEMENT', payload: updatedStyles },
+          { type: 'UPDATE_ELEMENT', payload: updateS },
           '*'
         );
       }
@@ -101,7 +119,13 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
               <EditorPanel
                 selectedElement={selectedElement}
                 onUpdate={handleUpdate}
-                onClose={()=>{setSelectedElement(null)}}
+                onClose={()=>{setSelectedElement(null);
+                  if(iframeRef.current?.contentWindow){
+                    iframeRef.current.contentWindow.postMessage({type:
+                      'CLEAR_SELECTION_REQUEST'
+                    },'*')
+                  }
+                }}
               />
             )}
           </>

@@ -11,7 +11,7 @@ const Preview = () => {
    const [code,setCode]=useState('');
     const[loading,setLoading]=useState(true);
 
-    const fetchCode=async()=>{
+  const fetchCode=async()=>{
       setTimeout(() => {
         const code=dummyProjects.find((project) => project.id === projectId)?.current_code;
         if(code){
@@ -22,7 +22,7 @@ const Preview = () => {
           
         }, 2000);
       }
-       useEffect(()=>{
+  useEffect(()=>{
     fetchCode();
   },[])
 

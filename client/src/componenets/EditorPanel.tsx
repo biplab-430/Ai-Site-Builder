@@ -19,12 +19,21 @@ interface SelectedElement {
 }
 
 interface EditorPanelProps {
-  selectedElement: SelectedElement | null;
-  onUpdate: (updates: {
-    text?: string;
-    className?: string;
-    styles?: Partial<ElementStyles>;
-  }) => void;
+  selectedElement:{
+    tagName:string;
+    className:string;
+    text:string;
+    styles:{
+      padding:string;
+      margin:string;
+      backgroundColor:string;
+      color:string;
+      fontSize:string;
+    };
+  } | null;
+
+  //onUpdate: (updates: Partial<EditorPanelProps["selectedElement"]>) => void;
+  onUpdate:(updates: any)=>void;
   onClose: () => void;
 }
 
@@ -54,40 +63,37 @@ const EditorPanel = ({
   onClose,
 }: EditorPanelProps) => {
 
-  const [values, setValues] = useState<SelectedElement | null>(null);
+  const [values, setValues] = useState(selectedElement)
 
   useEffect(() => {
     setValues(selectedElement);
   }, [selectedElement]);
 
-  if (!values) return null;
+  if (!values  || !selectedElement) return null;
 
   /* -------- Text / Class updates -------- */
 
-  const handleChange = (field: 'text' | 'className', value: string) => {
-    setValues((prev) =>
-      prev ? { ...prev, [field]: value } : prev
-    );
-    onUpdate({ [field]: value });
+  const handleChange = (field: string, value: string) => {
+    const newValues= {...values,[field]:value};
+    if(field in values.styles){
+      newValues.styles={...values.styles,[field]:value}
+    }
+    setValues(newValues);
+    onUpdate({[field]:value});
   };
 
   /* -------- Style updates -------- */
 
   const handleStyleChange = (
-    styleName: keyof ElementStyles,
+    styleName: string,
     value: string
   ) => {
-    setValues((prev) =>
-      prev
-        ? {
-            ...prev,
-            styles: { ...prev.styles, [styleName]: value },
-          }
-        : prev
-    );
-
-    onUpdate({ styles: { [styleName]: value } });
+   const newStyles={...values.styles,[styleName]:value} ;
+   setValues({...values,styles:newStyles})
+   onUpdate({styles:{[styleName]:value}})
   };
+
+
 
   return (
     <div className="absolute top-4 right-4 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-50 animate-fade-in fade-in ">
@@ -125,7 +131,7 @@ const EditorPanel = ({
           <input
             type="text"
             className="w-full text-sm p-2 border border-gray-400 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
-            value={values.className}
+            value={values.className || ''}
             onChange={(e) =>
               handleChange('className', e.target.value)
             }
@@ -140,7 +146,7 @@ const EditorPanel = ({
             </label>
             <input
               type="text"
-              className="w-full text-sm p-2 border border-gray-400 rounded-md"
+              className="w-full text-sm p-2 border border-gray-400 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
               value={values.styles.padding}
               onChange={(e) =>
                 handleStyleChange('padding', e.target.value)
@@ -154,7 +160,7 @@ const EditorPanel = ({
             </label>
             <input
               type="text"
-              className="w-full text-sm p-2 border border-gray-400 rounded-md"
+              className="w-full text-sm p-2 border border-gray-400 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
               value={values.styles.margin}
               onChange={(e) =>
                 handleStyleChange('margin', e.target.value)
@@ -164,18 +170,20 @@ const EditorPanel = ({
         </div>
 
         {/* Font Size */}
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Font Size
-          </label>
-          <input
-            type="text"
-            className="w-full text-sm p-2 border border-gray-400 rounded-md"
-            value={values.styles.fontSize}
-            onChange={(e) =>
-              handleStyleChange('fontSize', e.target.value)
-            }
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              Font Size
+            </label>
+            <input
+              type="text"
+              className="w-full text-sm p-2 border border-gray-400 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+              value={values.styles.fontSize}
+              onChange={(e) =>
+                handleStyleChange('fontSize', e.target.value)
+              }
+            />
+          </div>
         </div>
 
         {/* Colors */}
@@ -188,8 +196,8 @@ const EditorPanel = ({
             <div className="flex items-center gap-2 border border-gray-400 rounded-md p-1">
               <input
                 type="color"
-                className="w-6 h-6 cursor-pointer"
-                value={rgbToHex(values.styles.backgroundColor)}
+                className="w-6 h-6 cursor-pointer border-none p-0"
+                value={values.styles.backgroundColor =='rgba(0,0,0,0)' ? '#ffffff' : values.styles.backgroundColor}
                 onChange={(e) =>
                   handleStyleChange(
                     'backgroundColor',
@@ -197,9 +205,7 @@ const EditorPanel = ({
                   )
                 }
               />
-              <span className="text-xs text-gray-600 truncate">
-                {rgbToHex(values.styles.backgroundColor)}
-              </span>
+             <span className='text-xs text-gray-600 truncate'>{values.styles.backgroundColor }</span>
             </div>
           </div>
 
@@ -212,14 +218,13 @@ const EditorPanel = ({
               <input
                 type="color"
                 className="w-6 h-6 cursor-pointer"
-                value={rgbToHex(values.styles.color)}
+                value={values.styles.color}
                 onChange={(e) =>
                   handleStyleChange('color', e.target.value)
                 }
               />
-              <span className="text-xs text-gray-600 truncate">
-                {rgbToHex(values.styles.color)}
-              </span>
+              <span className='text-xs text-gray-600 truncate'>{values.styles.color }</span>
+             
             </div>
           </div>
         </div>
