@@ -1,3 +1,4 @@
+import ai from '../Configs/Gemini.js';
 export const generateWithFallbackAndRetry = async (
   contents: string,
   systemInstruction: string,

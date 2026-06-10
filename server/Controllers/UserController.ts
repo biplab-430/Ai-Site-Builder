@@ -213,7 +213,7 @@ You are an expert frontend web developer.
 AVAILABLE IMAGES:
 
 ${imageUrls
-  .map((url, index) => `Image ${index + 1}: ${url}`)
+  .map((url: string, index: number) => `Image ${index + 1}: ${url}`)
   .join("\n")}
 
 Requirements:
