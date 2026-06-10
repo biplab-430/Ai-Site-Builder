@@ -7,7 +7,7 @@ import userRouter from './routes/UserRoute.js';
 import projectRouter from './routes/ProjectRoute.js';
 const app = express();
 
-app.use(express.json());
+app.use(express.json({limit:'50mb'}))
 
 const corsOptions={
     origin:process.env.TRUSTED_ORIGINS?.split(',') || [],
@@ -16,7 +16,7 @@ const corsOptions={
 app.use(cors(corsOptions));
 app.all('/api/auth/{*any}', toNodeHandler(auth));
 
-app.use(express.json({limit:'50mb'}))
+
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Express + TypeScript server running 🚀');

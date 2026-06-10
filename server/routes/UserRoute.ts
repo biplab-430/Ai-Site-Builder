@@ -8,7 +8,7 @@ userRouter.get('/credits',protect, getUserCredits)
 userRouter.post('/project',protect,CreateUserProject)
 userRouter.get('/project/:projectId',protect,getUserProject)
 userRouter.get('/projects',protect, getUserAllProjects)
-userRouter.get('/publish-toggle/:projectId',protect, toggleProjectPublish)
+userRouter.put('/publish-toggle/:projectId',protect, toggleProjectPublish)
 userRouter.post('/purchase-credits',protect, purchaseCredits)
 
 export default userRouter;

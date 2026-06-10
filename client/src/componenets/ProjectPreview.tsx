@@ -1,4 +1,4 @@
-import  {
+import {
   forwardRef,
   useEffect,
   useRef,
@@ -23,21 +23,20 @@ interface ProjectPreviewProps {
 
 const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
   ({ project, isGenerating, device = 'desktop', showEditorPanel = true }, ref) => {
-
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
-
-    const [selectedElement, setSelectedElement] = useState<any>(null);
+    // Replaced 'any' with a more generic object type, assuming payload is an object representing DOM traits
+    const [selectedElement, setSelectedElement] = useState<Record<string, unknown> | null>(null);
 
     const injectPreview = (html: string) => {
-      if(!html) return '';
-      if(!showEditorPanel) return html;
-      if(html.includes('</body>')){
-        return html.replace('</body>',iframeScript + '</body>')
-      }else{
+      if (!html) return '';
+      if (!showEditorPanel) return html;
+      
+      if (html.includes('</body>')) {
+        return html.replace('</body>', iframeScript + '</body>');
+      } else {
         return html + iframeScript;
       }
-       
     };
 
     const resolutions = {
@@ -46,41 +45,43 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
       desktop: 'w-full',
     };
 
-
-
     useImperativeHandle(ref, () => ({
-      getcode: () =>{
-        const doc=iframeRef.current?.contentDocument;
-        if(!doc) return undefined;
+      getcode: () => {
+        const doc = iframeRef.current?.contentDocument;
+        if (!doc) return undefined;
 
-        //REMOVE SELECTION 
+        // 1. REMOVE SELECTION TRACES
+        doc.querySelectorAll('.ai-selected-element, [data-ai-selected]').forEach((el) => {
+          el.classList.remove('ai-selected-element');
+          el.removeAttribute('data-ai-selected');
+          (el as HTMLElement).style.outline = '';
+        });
 
-        doc.querySelectorAll('.ai-selected-element,[data-ai-selected]').forEach((el)=>{
-          el.classList.remove('ai-selected-element')
-        el.removeAttribute('data-ai-selected');
-          (el as HTMLElement).style.outline='';
+        // 2. REMOVE INJECTED SCRIPTS & STYLES
+        const previewStyle = doc.getElementById('ai-preview-style');
+        if (previewStyle) previewStyle.remove();
         
-      })
+        const previewScript = doc.getElementById('ai-preview-script');
+        if (previewScript) previewScript.remove();
 
-       //REMOVE STYLE 
-
-      const previewStyle=doc.getElementById('ai-preview-style');
-      if(previewStyle) previewStyle.remove();
-      const  previewScript=doc.getElementById('ai-preview-script');
-      if(previewScript) previewScript.remove();
-
-      //clean html
-
-      const html=doc.documentElement.outerHTML;
-      return html;
-
+        // 3. CLEAN HTML & PRESERVE DOCTYPE
+        // Without the DOCTYPE, downloaded HTML will render in "Quirks Mode" and break modern CSS.
+        let html = doc.documentElement.outerHTML;
+        
+        // Ensure DOCTYPE is attached at the very top
+        if (!html.toLowerCase().startsWith('<!doctype html>')) {
+          html = `<!DOCTYPE html>\n${html}`;
+        }
+        
+        return html;
       }
     }));
 
-
-
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
+        // Optional Security Check: Ensure message comes from our iframe
+        if (event.source !== iframeRef.current?.contentWindow) return;
+
         if (event.data?.type === 'ELEMENT_SELECTED') {
           setSelectedElement(event.data.payload);
         } else if (event.data?.type === 'CLEAR_SELECTION') {
@@ -92,21 +93,18 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
       return () => window.removeEventListener('message', handleMessage);
     }, []);
 
-    // ✅ Define update handler (adjust logic as needed)
-  const handleUpdate = (updateS: any) => {
+    const handleUpdate = (updateS: Record<string, unknown>) => {
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage(
           { type: 'UPDATE_ELEMENT', payload: updateS },
-          '*'
+          '*' // In a production app with a known domain, replace '*' with window.location.origin
         );
       }
     };
 
-    
-
     return (
       <div className="relative h-full bg-gray-900 flex-1 rounded-xl overflow-hidden max-sm:ml-2">
-        {project.current_code ? (
+        {project?.current_code ? (
           <>
             <iframe
               ref={iframeRef}
@@ -119,18 +117,20 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
               <EditorPanel
                 selectedElement={selectedElement}
                 onUpdate={handleUpdate}
-                onClose={()=>{setSelectedElement(null);
-                  if(iframeRef.current?.contentWindow){
-                    iframeRef.current.contentWindow.postMessage({type:
-                      'CLEAR_SELECTION_REQUEST'
-                    },'*')
+                onClose={() => {
+                  setSelectedElement(null);
+                  if (iframeRef.current?.contentWindow) {
+                    iframeRef.current.contentWindow.postMessage(
+                      { type: 'CLEAR_SELECTION_REQUEST' }, 
+                      '*'
+                    );
                   }
                 }}
               />
             )}
           </>
         ) : isGenerating ? (
-         <Loaderstep/>
+          <Loaderstep />
         ) : null}
       </div>
     );

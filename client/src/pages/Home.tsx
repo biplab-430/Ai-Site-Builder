@@ -49,7 +49,7 @@ const onSubmitHandler = async (e:React.FormEvent) => {
           </p>
         </a> */}
 
-        <h1 className="text-center text-[40px] leading-[48px] md:text-6xl md:leading-[70px] mt-4 font-semibold max-w-3xl">
+        <h1 className="text-center text-[40px] leading-12 b md:text-6xl md:leading-[70px] mt-4 font-semibold max-w-3xl">
           Turn thoughts into Websites Instantly, With AI
         </h1>
 

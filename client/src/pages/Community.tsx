@@ -1,112 +1,145 @@
-import {useState,useEffect} from 'react'
+import { useState, useEffect } from 'react';
 import type { Project } from "../types";
-import { Loader2Icon, PlusIcon, TrashIcon } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { dummyProjects } from "../assets/assets";
-
 import Footer from '../componenets/Footer';
+import api from '@/config/Axios';
+import { toast } from 'sonner';
+import { authClient } from "@/lib/auth-client"; // <-- Import auth client
 
 const Community = () => {
-   const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const navigate = useNavigate();
 
-  const fetchProjects = async () => {
-    setProjects(dummyProjects);
+  // <-- Add session check
+  const { data: session, isPending } = authClient.useSession(); 
 
-    setTimeout(() => {
+  const fetchProjects = async () => {
+    try {
+      const { data } = await api.get('/api/project/published');
+      setProjects(data.projects || []);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to load community projects");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-
+  // <-- Auth Guard Effect
   useEffect(() => {
-    fetchProjects();
-  }, []);
- return (
+    if (!isPending && !session?.user) {
+      toast.error("Please sign in to view the community");
+      navigate("/");
+    }
+  }, [isPending, session, navigate]);
+
+  // <-- Only fetch if user exists
+  useEffect(() => {
+    if (session?.user) {
+      fetchProjects();
+    }
+  }, [session]);
+
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <Loader2Icon className="size-8 animate-spin text-indigo-400" />
+      </div>
+    );
+  }
+
+  if (!session?.user) return null;
+
+  return (
     <>
-    <div className="px-4 md:px-16 lg:px-24 xl:px-32">
-      {loading ? (
-        <div className="flex items-center justify-center h-[80vh]">
-          <Loader2Icon className="size-7 animate-spin text-indigo-300" />
-        </div>
-      ) : projects.length > 0 ? (
-        <div className="py-10 min-h-[80vh]">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-12">
-            <h1 className="text-2xl font-medium text-white">Published Projects</h1>
-
+      <div className="px-4 md:px-16 lg:px-24 xl:px-32">
+        {loading ? (
+          <div className="flex items-center justify-center h-[80vh]">
+            <Loader2Icon className="size-7 animate-spin text-indigo-300" />
           </div>
+        ) : projects.length > 0 ? (
+          <div className="py-10 min-h-[80vh]">
+            <div className="flex items-center justify-between mb-12">
+              <h1 className="text-2xl font-medium text-white">Published Projects</h1>
+            </div>
 
-          {/* Projects Grid */}
-          <div className="flex flex-wrap gap-4">
-            {projects.map((project) => (
-              <Link key={project.id} to={`/view/${project.id}`}
-                target='_blank'
-                className="relative group w-72 max-sm:mx-auto cursor-pointer
-                bg-gray-900/60 border border-gray-700 rounded-lg overflow-hidden
-                hover:border-indigo-800/80
-                transition-all duration-300"
-              >
-                {/* Preview */}
-                <div className="relative w-full h-40 bg-gray-900 overflow-hidden border-b border-gray-800">
-                  {project.current_code ? (
-                    <iframe
-                      srcDoc={project.current_code}
-                      title="preview"
-                      sandbox="allow-scripts allow-same-origin"
-                      className="absolute top-0 left-0 w-300 h-200 origin-top-left pointer-events-none"
-                      style={{ transform: "scale(0.25)" }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                      No Preview Available
+            <div className="flex flex-wrap gap-4">
+              {projects.map((project) => (
+                <Link 
+                  key={project.id} 
+                  to={`/view/${project.id}`}
+                  target='_blank'
+                  className="relative group w-72 max-sm:mx-auto cursor-pointer bg-gray-900/60 border border-gray-700 rounded-lg overflow-hidden hover:border-indigo-800/80 hover:shadow-lg hover:shadow-indigo-700/20 transition-all duration-300 flex flex-col"
+                >
+                  <div className="relative w-full h-40 bg-gray-900 overflow-hidden border-b border-gray-800 shrink-0">
+                    {project.current_code ? (
+                      <iframe
+                        srcDoc={project.current_code}
+                        title="preview"
+                        sandbox="allow-scripts allow-same-origin"
+                        className="absolute top-0 left-0 w-[1200px] h-[800px] origin-top-left pointer-events-none"
+                        style={{ transform: "scale(0.25)" }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                        No Preview Available
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 text-white flex-1 flex flex-col bg-gradient-to-t from-gray-950 to-transparent group-hover:from-indigo-950/50 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <h2 className="text-lg font-medium line-clamp-2">{project.name}</h2>
+                      <button className="px-2.5 py-0.5 mt-1 ml-2 text-[10px] bg-gray-800 border border-gray-700 rounded-full shrink-0">
+                        Website
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                {/* content */}
-              <div className="p-4 text-white bg-linear-180 from-transparent group-hover:from-indigo-50-950 to-transparent transition-colors">
-                 <div className="flex items-start justify-between">
-                  <h2 className="text-lg font-medium line-clamp-2">{project.name}</h2>
-                  <button className="px-2.5 py-0.5mt-1 ml-2 text-xs bg-gray-800 border border-gray-700 rounded-full">Website</button>
-                 </div>
-                 <p className="text-gray-400 mt-1 text-sm line-clamp-2">{project.initial_prompt}</p>
-                 <div  className="flex justify-between items-center mt-6">
-                     <span className="text-xs text-gray-500">{new Date(project.createdAt).toLocaleDateString()}</span>
-                 </div>
-                 <div className="flex gap-3 text-white text-sm">
-                  <button  className="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-md transition-all  flex items-center gap-2">
-                    <span className='bg-gray-200 size-4 rounded-full text-black font-semibold flex items-center justify-center'>{project.user?.name?.slice(0,1)}</span>
-                    {project.user?.name}
-                  </button>
-                  
-              
-                 </div>
-              </div>
-             
-              </Link>
-            ))}
+                    
+                    <p className="text-gray-400 mt-2 text-sm line-clamp-2 flex-1">
+                      {project.initial_prompt}
+                    </p>
+                    
+                    <div className="flex justify-between items-center mt-6">
+                      <span className="text-xs text-gray-500">
+                        {new Date(project.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    
+                    <div className="flex gap-3 text-white text-sm mt-4">
+                      <button className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-all flex items-center gap-2 w-full justify-center">
+                        <span className="bg-gray-200 size-5 rounded-full text-black font-semibold flex items-center justify-center text-xs">
+                          {project.user?.name?.charAt(0).toUpperCase() || "U"}
+                        </span>
+                        <span className="truncate">
+                          {project.user?.name || "Anonymous User"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-[80vh]">
-          <h1 className="text-3xl font-semibold text-gray-300">
-            You have no projects yet
-          </h1>
-          <button
-            onClick={() => navigate("/")}
-            className="text-white px-5 py-2 mt-5 rounded-md
-            bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all"
-          >
-            Create New
-          </button>
-        </div>
-      )}
-    </div>
-    <Footer/>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[80vh]">
+            <h1 className="text-3xl font-semibold text-gray-300">
+              No published projects yet
+            </h1>
+            <p className="text-gray-500 mt-2">Be the first to publish a project to the community!</p>
+            <button
+              onClick={() => navigate("/")}
+              className="text-white px-5 py-2 mt-6 rounded-md bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all"
+            >
+              Create New Project
+            </button>
+          </div>
+        )}
+      </div>
+      <Footer />
     </>
   );
 };
 
-export default Community
+export default Community;

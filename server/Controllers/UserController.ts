@@ -1,6 +1,63 @@
 import {Request,Response} from 'express'
 import prisma from '../lib/prisma.js';
 import openai from '../Configs/OpenAi.js';
+import ai from '../Configs/Gemini.js';
+import {searchPexelsImages} from '../lib/helperImage.js'
+
+export const generateWithFallbackAndRetry = async (
+  contents: string,
+  systemInstruction: string,
+  retries = 3
+) => {
+  // Define your model hierarchy (preferred first, fallbacks next)
+  const models = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+  ];
+
+  // Outer Loop: Iterate through the available models
+  for (const model of models) {
+    console.log(`\n--- Activating model: ${model} ---`);
+
+    // Inner Loop: Handle retries for the currently selected model
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        // If successful, this returns the payload and exits both loops
+        return await ai.models.generateContent({
+          model,
+          config: { systemInstruction },
+          contents,
+        });
+
+      } catch (error: any) {
+        console.error(`[${model}] Attempt ${attempt} failed.`);
+        console.error("Status:", error?.status);
+        console.error("Message:", error?.message);
+
+        // Scenario A: Transient Error (503). Wait and retry the SAME model.
+        if (error?.status === 503 && attempt < retries) {
+          const delayMs = attempt * 3000;
+          console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
+          
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue; // Skips to the next iteration of the inner loop
+        }
+
+        // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
+        // Break out of the inner retry loop to switch to the NEXT model.
+        console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
+        break; 
+      }
+    }
+  }
+
+  // If the code execution reaches this point, all models and all retries have failed.
+  throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
+};
+
+
+
 
 // user credits
 export const getUserCredits=async(req:Request,res:Response)=>{
@@ -42,9 +99,9 @@ export const CreateUserProject = async (req: Request, res: Response) => {
     });
 
     if (!user || user.credits < 5) {
-      return res
-        .status(403)
-        .json({ message: "Insufficient credits" });
+      return res.status(403).json({
+        message: "Insufficient credits",
+      });
     }
 
     const project = await prisma.websiteProject.create({
@@ -69,30 +126,67 @@ export const CreateUserProject = async (req: Request, res: Response) => {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        credits: { decrement: 5 },
-        totalCreation: { increment: 1 },
+        credits: {
+          decrement: 5,
+        },
+        totalCreation: {
+          increment: 1,
+        },
       },
     });
 
     creditsDeducted = true;
 
-    const promptEnhancedResponse =
-      await openai.chat.completions.create({
-        model: "google/gemma-3-12b-it:free",
-        messages: [
-          {
-            role: "system",
-            content: `You are a prompt enhancement specialist...`,
-          },
-          {
-            role: "user",
-            content: initial_prompt,
-          },
-        ],
-      });
+    // STEP 1: Enhance Prompt
+    const promptEnhancedResponse = await generateWithFallbackAndRetry(
+      initial_prompt,
+      `
+You are a professional prompt enhancement specialist.
 
-    const enhancedPrompt =
-      promptEnhancedResponse.choices[0].message.content || "";
+Your task:
+- Improve the user's website idea.
+- Add missing UI/UX details.
+- Add relevant sections and features.
+- Improve design requirements.
+- Make the prompt detailed and production-ready.
+
+Return ONLY the enhanced prompt.
+`
+    );
+
+    const enhancedPrompt = promptEnhancedResponse.text?.trim() || "";
+
+    if (!enhancedPrompt) {
+      throw new Error("Prompt enhancement failed");
+    }
+// for image generation properly 
+const imageKeywordResponse =
+  await generateWithFallbackAndRetry(
+    enhancedPrompt,
+    `
+Return ONLY one highly specific image search keyword.
+
+Examples:
+Restaurant website -> restaurant food
+Gym website -> fitness gym
+Travel website -> travel tourism
+Portfolio website -> software developer
+
+Return only the keyword.
+`
+  );
+
+const imageKeyword =
+  imageKeywordResponse.text?.trim() || "business";
+
+  const imageUrls = await searchPexelsImages(
+  imageKeyword,
+  8
+);
+
+console.log("Image Keyword:", imageKeyword);
+console.log("Pexels Images:", imageUrls);
+
 
     await prisma.conversation.create({
       data: {
@@ -110,31 +204,69 @@ export const CreateUserProject = async (req: Request, res: Response) => {
       },
     });
 
-    const codeGenerationResponse =
-      await openai.chat.completions.create({
-        model: "google/gemma-3-12b-it:free",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert web developer...`,
-          },
-          {
-            role: "user",
-            content: enhancedPrompt,
-          },
-        ],
-      });
+    // STEP 2: Generate Website Code
+    const codeGenerationResponse = await generateWithFallbackAndRetry(
+      enhancedPrompt,
+      `
+You are an expert frontend web developer.
 
-    const rawCode =
-      codeGenerationResponse.choices[0].message.content;
+AVAILABLE IMAGES:
+
+${imageUrls
+  .map((url, index) => `Image ${index + 1}: ${url}`)
+  .join("\n")}
+
+Requirements:
+
+- Return ONLY a complete HTML document starting with <!DOCTYPE html>.
+- Include all CSS inside <style> tags.
+- Include all JavaScript inside <script> tags.
+- Create a modern responsive design.
+- Use clean semantic HTML and modern CSS.
+- Add animations when appropriate.
+
+IMAGE RULES:
+- Use ONLY the provided image URLs.
+- Hero section MUST use Image 1.
+- Other sections should use the remaining images.
+- Never use picsum.photos.
+- Never use placehold.co.
+- Never invent image URLs.
+- Never use local file paths.
+
+- Do not explain anything.
+- Do not use markdown.
+- Do not wrap code in triple backticks.
+- Output must be directly renderable in a browser.
+`
+    );
+
+    const rawCode = codeGenerationResponse.text?.trim();
 
     if (!rawCode) {
-      throw new Error("Code generation failed");
+        await prisma.conversation.create({
+      data: {
+        role: "assistant",
+        content:
+          "unable to generate the code please try again later",
+        projectId:project.id
+      },
+    });
+     await prisma.user.update({
+          where: { id: userId },
+          data: {
+            credits: {
+              increment: 5,
+            },
+          },
+        });
+
+        return ;
     }
 
     const cleanedCode = rawCode
-      .replace(/```[a-z]*\n?/gi, "")
-      .replace(/```$/g, "")
+      .replace(/```html/gi, "")
+      .replace(/```/g, "")
       .trim();
 
     const version = await prisma.version.create({
@@ -146,7 +278,9 @@ export const CreateUserProject = async (req: Request, res: Response) => {
     });
 
     await prisma.websiteProject.update({
-      where: { id: project.id },
+      where: {
+        id: project.id,
+      },
       data: {
         current_code: cleanedCode,
         current_version_index: version.id,
@@ -162,19 +296,38 @@ export const CreateUserProject = async (req: Request, res: Response) => {
       },
     });
 
-    return res.json({ projectId: project.id });
-
+    return res.status(200).json({
+      success: true,
+      projectId: project.id,
+      versionId: version.id,
+    });
   } catch (error: any) {
-    if (creditsDeducted) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { credits: { increment: 5 } },
-      });
+    console.error("Create Project Error:", error);
+
+    if (creditsDeducted && userId) {
+      try {
+        await prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            credits: {
+              increment: 5,
+            },
+          },
+        });
+      } catch (refundError) {
+        console.error("Credit Refund Failed:", refundError);
+      }
     }
 
-    return res.status(500).json({
-      message: "Internal server error",
-      error: error.message,
+    return res.status(error?.status === 503 ? 503 : 500).json({
+      success: false,
+      message:
+        error?.status === 503
+          ? "AI service is currently busy. Please try again in a minute."
+          : "Internal server error",
+      error: error?.message || "Unknown error",
     });
   }
 };
@@ -229,33 +382,71 @@ export const getUserAllProjects=async(req:Request,res:Response)=>{
 
 // toggle project publish
 
-export const toggleProjectPublish=async(req:Request,res:Response)=>{
-    try {
-        const userId=req.userId;
-        if(!userId){
-            return res.status(401).json({message:"unauthorized"})
-        }
-        const {projectId}=req.params;
+// export const toggleProjectPublish=async(req:Request,res:Response)=>{
+//     try {
+//         const userId=req.userId;
+//         if(!userId){
+//             return res.status(401).json({message:"unauthorized"})
+//         }
+//         const {projectId}=req.params;
 
-       const project=await prisma.websiteProject.findUnique({
-       where:{id:projectId,userId:userId},
-       })
-       if(!project){
-        return res.status(404).json({message:'project not found'})
-       }
-       await prisma.websiteProject.update({
-       where:{id:projectId},
-       data:{
-        isPublished:!project.isPublished
-       }
-       })
+//        const project=await prisma.websiteProject.findUnique({
+//        where:{id:projectId,userId:userId},
+//        })
+//        if(!project){
+//         return res.status(404).json({message:'project not found'})
+//        }
+//        await prisma.websiteProject.update({
+//        where:{id:projectId},
+//        data:{
+//         isPublished:!project.isPublished
+//        }
+//        })
 
-       res.json({message:project.isPublished?'project Unpublished Successfully':'project Published Successfully'})
+//        res.json({message:project.isPublished?'project Unpublished Successfully':'project Published Successfully'})
 
-    }catch (error: any) {
-        return res.status(500).json({message:"Internal server error", error:error.message})
+//     }catch (error: any) {
+//         return res.status(500).json({message:"Internal server error", error:error.message})
+//     }
+// }
+export const toggleProjectPublish = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" });
     }
-}
+    const { projectId } = req.params;
+
+    const project = await prisma.websiteProject.findUnique({
+      where: { id: projectId, userId: userId },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: "project not found" });
+    }
+
+    // 1. Capture the newly updated database record
+    const updatedProject = await prisma.websiteProject.update({
+      where: { id: projectId },
+      data: {
+        isPublished: !project.isPublished,
+      },
+    });
+
+    // 2. Evaluate the message based on the NEW state
+    res.json({
+      message: updatedProject.isPublished
+        ? "project Published Successfully"
+        : "project Unpublished Successfully",
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({ 
+      message: "Internal server error", 
+      error: error.message 
+    });
+  }
+};
 // to purchase credits
 
 export const purchaseCredits=async(req:Request,res:Response)=>{
