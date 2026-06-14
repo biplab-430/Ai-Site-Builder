@@ -1,4 +1,9 @@
+import {Request,Response} from 'express'
+import prisma from '../lib/prisma.js';
+import openai from '../Configs/OpenAi.js';
 import ai from '../Configs/Gemini.js';
+import {searchPexelsImages} from '../lib/helperImage.js'
+
 export const generateWithFallbackAndRetry = async (
   contents: string,
   systemInstruction: string,

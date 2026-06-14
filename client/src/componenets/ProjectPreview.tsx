@@ -25,7 +25,6 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
   ({ project, isGenerating, device = 'desktop', showEditorPanel = true }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    // Replaced 'any' with a more generic object type, assuming payload is an object representing DOM traits
     const [selectedElement, setSelectedElement] = useState<Record<string, unknown> | null>(null);
 
     const injectPreview = (html: string) => {
@@ -65,10 +64,8 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
         if (previewScript) previewScript.remove();
 
         // 3. CLEAN HTML & PRESERVE DOCTYPE
-        // Without the DOCTYPE, downloaded HTML will render in "Quirks Mode" and break modern CSS.
         let html = doc.documentElement.outerHTML;
         
-        // Ensure DOCTYPE is attached at the very top
         if (!html.toLowerCase().startsWith('<!doctype html>')) {
           html = `<!DOCTYPE html>\n${html}`;
         }
@@ -79,7 +76,6 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
 
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
-        // Optional Security Check: Ensure message comes from our iframe
         if (event.source !== iframeRef.current?.contentWindow) return;
 
         if (event.data?.type === 'ELEMENT_SELECTED') {
@@ -97,14 +93,25 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage(
           { type: 'UPDATE_ELEMENT', payload: updateS },
-          '*' // In a production app with a known domain, replace '*' with window.location.origin
+          '*' 
         );
       }
     };
 
     return (
       <div className="relative h-full bg-gray-900 flex-1 rounded-xl overflow-hidden max-sm:ml-2">
-        {project?.current_code ? (
+        
+        {/* 1. THE LOADER OVERLAY */}
+        {/* If generating, this absolute div covers the entire relative parent container */}
+        {isGenerating && (
+          <div className="absolute inset-0 z-50 bg-gray-950 flex flex-col">
+            <Loaderstep />
+          </div>
+        )}
+
+        {/* 2. THE IFRAME */}
+        {/* The iframe stays mounted so it doesn't lose state, but the loader hides it visually */}
+        {project?.current_code && (
           <>
             <iframe
               ref={iframeRef}
@@ -129,9 +136,7 @@ const ProjectPreview = forwardRef<ProjectPreviewRef, ProjectPreviewProps>(
               />
             )}
           </>
-        ) : isGenerating ? (
-          <Loaderstep />
-        ) : null}
+        )}
       </div>
     );
   }

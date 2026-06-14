@@ -3,58 +3,9 @@ import prisma from '../lib/prisma.js';
 import openai from '../Configs/OpenAi.js';
 import ai from '../Configs/Gemini.js';
 import {searchPexelsImages} from '../lib/helperImage.js'
+import {generateWithFallbackAndRetry} from '../lib/Fallback.js'
 
-export const generateWithFallbackAndRetry = async (
-  contents: string,
-  systemInstruction: string,
-  retries = 3
-) => {
-  // Define your model hierarchy (preferred first, fallbacks next)
-  const models = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-  ];
 
-  // Outer Loop: Iterate through the available models
-  for (const model of models) {
-    console.log(`\n--- Activating model: ${model} ---`);
-
-    // Inner Loop: Handle retries for the currently selected model
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        // If successful, this returns the payload and exits both loops
-        return await ai.models.generateContent({
-          model,
-          config: { systemInstruction },
-          contents,
-        });
-
-      } catch (error: any) {
-        console.error(`[${model}] Attempt ${attempt} failed.`);
-        console.error("Status:", error?.status);
-        console.error("Message:", error?.message);
-
-        // Scenario A: Transient Error (503). Wait and retry the SAME model.
-        if (error?.status === 503 && attempt < retries) {
-          const delayMs = attempt * 3000;
-          console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
-          
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          continue; // Skips to the next iteration of the inner loop
-        }
-
-        // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
-        // Break out of the inner retry loop to switch to the NEXT model.
-        console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
-        break; 
-      }
-    }
-  }
-
-  // If the code execution reaches this point, all models and all retries have failed.
-  throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
-};
 
 
 
@@ -340,7 +291,7 @@ export const getUserProject=async(req:Request,res:Response)=>{
         if(!userId){
             return res.status(401).json({message:"unauthorized"})
         }
-        const {projectId}=req.params;
+        const projectId = req.params.projectId as string;
        const project=await prisma.websiteProject.findUnique({
        where:{id:projectId,userId:userId},
        include:{
@@ -388,7 +339,7 @@ export const getUserAllProjects=async(req:Request,res:Response)=>{
 //         if(!userId){
 //             return res.status(401).json({message:"unauthorized"})
 //         }
-//         const {projectId}=req.params;
+//         const projectId = req.params.projectId as string;
 
 //        const project=await prisma.websiteProject.findUnique({
 //        where:{id:projectId,userId:userId},
@@ -415,7 +366,7 @@ export const toggleProjectPublish = async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(401).json({ message: "unauthorized" });
     }
-    const { projectId } = req.params;
+  const projectId = req.params.projectId as string;
 
     const project = await prisma.websiteProject.findUnique({
       where: { id: projectId, userId: userId },
@@ -458,4 +409,57 @@ export const purchaseCredits=async(req:Request,res:Response)=>{
     }
 }
 
-// 
+// get conversation of all
+
+// to get all conversations for a specific project
+export const getConversation = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" });
+    }
+
+    const projectId = req.params.projectId as string;
+
+    if (!projectId) {
+      return res.status(400).json({ message: "Project ID is required" });
+    }
+
+    // 1. Verify the project exists AND belongs to the requesting user
+    const project = await prisma.websiteProject.findUnique({
+      where: { 
+        id: projectId, 
+        userId: userId 
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found or unauthorized" });
+    }
+
+    // 2. Fetch the conversation history for this project
+    const conversation = await prisma.conversation.findMany({
+      where: { 
+        projectId: projectId 
+      },
+      orderBy: { 
+        timestamp: 'asc' // Orders from oldest to newest so the chat flows correctly
+      },
+    });
+
+    // 3. Return the conversation array
+    res.status(200).json({ 
+      success: true,
+      conversation 
+    });
+
+  } catch (error: any) {
+    console.error("Fetch Conversation Error:", error);
+    return res.status(500).json({ 
+      success: false,
+      message: "Internal server error", 
+      error: error.message 
+    });
+  }
+};

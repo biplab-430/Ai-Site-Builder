@@ -4,59 +4,60 @@ import prisma from "../lib/prisma.js";
 import {Request,Response} from 'express'
 import openai from '../Configs/OpenAi.js';
 import ai from "../Configs/Gemini.js";
+import {generateWithFallbackAndRetry} from '../lib/Fallback.js'
 
 
-export const generateWithFallbackAndRetry = async (
-  contents: string,
-  systemInstruction: string,
-  retries = 3
-) => {
-  // Define your model hierarchy (preferred first, fallbacks next)
-  const models = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-  ];
+// export const generateWithFallbackAndRetry = async (
+//   contents: string,
+//   systemInstruction: string,
+//   retries = 3
+// ) => {
+//   // Define your model hierarchy (preferred first, fallbacks next)
+//   const models = [
+//     "gemini-2.5-flash",
+//     "gemini-2.5-flash-lite",
+//     "gemini-2.0-flash",
+//   ];
 
-  // Outer Loop: Iterate through the available models
-  for (const model of models) {
-    console.log(`\n--- Activating model: ${model} ---`);
+//   // Outer Loop: Iterate through the available models
+//   for (const model of models) {
+//     console.log(`\n--- Activating model: ${model} ---`);
 
-    // Inner Loop: Handle retries for the currently selected model
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        // If successful, this returns the payload and exits both loops
-        return await ai.models.generateContent({
-          model,
-          config: { systemInstruction },
-          contents,
-        });
+//     // Inner Loop: Handle retries for the currently selected model
+//     for (let attempt = 1; attempt <= retries; attempt++) {
+//       try {
+//         // If successful, this returns the payload and exits both loops
+//         return await ai.models.generateContent({
+//           model,
+//           config: { systemInstruction },
+//           contents,
+//         });
 
-      } catch (error: any) {
-        console.error(`[${model}] Attempt ${attempt} failed.`);
-        console.error("Status:", error?.status);
-        console.error("Message:", error?.message);
+//       } catch (error: any) {
+//         console.error(`[${model}] Attempt ${attempt} failed.`);
+//         console.error("Status:", error?.status);
+//         console.error("Message:", error?.message);
 
-        // Scenario A: Transient Error (503). Wait and retry the SAME model.
-        if (error?.status === 503 && attempt < retries) {
-          const delayMs = attempt * 3000;
-          console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
+//         // Scenario A: Transient Error (503). Wait and retry the SAME model.
+//         if (error?.status === 503 && attempt < retries) {
+//           const delayMs = attempt * 3000;
+//           console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
           
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          continue; // Skips to the next iteration of the inner loop
-        }
+//           await new Promise((resolve) => setTimeout(resolve, delayMs));
+//           continue; // Skips to the next iteration of the inner loop
+//         }
 
-        // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
-        // Break out of the inner retry loop to switch to the NEXT model.
-        console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
-        break; 
-      }
-    }
-  }
+//         // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
+//         // Break out of the inner retry loop to switch to the NEXT model.
+//         console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
+//         break; 
+//       }
+//     }
+//   }
 
-  // If the code execution reaches this point, all models and all retries have failed.
-  throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
-};
+//   // If the code execution reaches this point, all models and all retries have failed.
+//   throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
+// };
 
 export const makeRevision = async (
   req: Request,
@@ -66,7 +67,7 @@ export const makeRevision = async (
   let creditsDeducted = false;
 
   try {
-    const { projectId } = req.params;
+   const projectId = req.params.projectId as string;
     const { message } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -79,7 +80,7 @@ export const makeRevision = async (
       });
     }
 
-    if (user.credits < 5) {
+    if (user.credits < 2) {
       return res.status(403).json({
         message: "add more credit",
       });
@@ -120,7 +121,7 @@ export const makeRevision = async (
       where: { id: userId },
       data: {
         credits: {
-          decrement: 5,
+          decrement: 2,
         },
       },
     });
@@ -216,7 +217,7 @@ if (!code) {
     where: { id: userId },
     data: {
       credits: {
-        increment: 5,
+        increment: 2,
       },
     },
   });
@@ -279,7 +280,7 @@ return res.status(200).json({
           where: { id: userId },
           data: {
             credits: {
-              increment: 5,
+              increment: 2,
             },
           },
         });
@@ -312,7 +313,8 @@ export const rollBackToVersion = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "unauthorized" })
     }
 
-    const { projectId, versionId } = req.params
+    const projectId = req.params.projectId as string;
+const versionId = req.params.versionId as string;
 
     if (!projectId || !versionId) {
       return res
@@ -329,7 +331,7 @@ export const rollBackToVersion = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "project not found" })
     }
 
-    const version = project.versions.find(v:any => v.id === versionId)
+    const version = project.versions.find(v => v.id === versionId)
 
     if (!version) {
       return res
@@ -373,7 +375,7 @@ export const rollBackToVersion = async (req: Request, res: Response) => {
 export const deleteProject = async (req: Request, res: Response) => {
   try {
     const userId = req.userId
-    const { projectId } = req.params
+    const projectId = req.params.projectId as string
 
     if (!userId) {
       return res.status(401).json({ message: "unauthorized" })
@@ -403,7 +405,7 @@ export const deleteProject = async (req: Request, res: Response) => {
 export const getProjectPreview = async (req: Request, res: Response) => {
   try {
     const userId = req.userId
-    const { projectId } = req.params
+    const projectId = req.params.projectId as string
 
     if (!userId) {
       return res.status(401).json({ message: "unauthorized" })
@@ -451,7 +453,7 @@ export const getPublishProject=async(req: Request, res: Response)=>{
 // get a single project by id
 export const getProjectById=async(req: Request, res: Response)=>{
   try {
-    const { projectId } = req.params
+    const projectId = req.params.projectId as string;
     const project = await prisma.websiteProject.findUnique({
       where: { id: projectId },
       include:{user:true}
@@ -476,7 +478,7 @@ export const getProjectById=async(req: Request, res: Response)=>{
 export const saveProjectCode=async(req: Request, res: Response)=>{
   try {
     const userId=req.userId;
-    const { projectId } = req.params
+    const projectId = req.params.projectId as string;
     const{code }=req.body;
     
    if (!userId) {

@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Typewriter from './Typewriter';
 
 interface SidebarProps {
   isMenuOpen: boolean;
@@ -160,14 +161,13 @@ const Sidebar = ({
                   new Date(a.timestamp).getTime() -
                   new Date(b.timestamp).getTime()
               )
-              .map((message) => {
-                const isMessage =
-                  "content" in message;
+              .map((message, index, array) => {
+                const isMessage = "content" in message;
+                const isLastItem = index === array.length - 1;
 
                 if (isMessage) {
                   const msg = message as Message;
-                  const isUser =
-                    msg.role === "user";
+                  const isUser = msg.role === "user";
 
                   return (
                     <div
@@ -179,7 +179,7 @@ const Sidebar = ({
                       }`}
                     >
                       {!isUser && (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center shrink-0">
                           <BotIcon className="size-5 text-white" />
                         </div>
                       )}
@@ -189,13 +189,20 @@ const Sidebar = ({
                           isUser
                             ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-tr-none"
                             : "bg-gray-800 text-gray-100 rounded-tl-none"
-                        } max-w-[80%] p-3 px-4 rounded-2xl shadow-sm text-sm leading-relaxed`}
+                        } max-w-[80%] p-3 px-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap`}
                       >
-                        {msg.content}
+                        {!isUser ? (
+                          <Typewriter 
+                            text={msg.content} 
+                            speed={isLastItem ? 25 : 0} 
+                          />
+                        ) : (
+                          msg.content
+                        )}
                       </div>
 
                       {isUser && (
-                        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
                           <UserIcon className="size-5 text-gray-200" />
                         </div>
                       )}
@@ -253,7 +260,7 @@ const Sidebar = ({
 
             {isGenerating && (
               <div className="flex items-start gap-3 justify-start">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center shrink-0">
                   <BotIcon className="size-5 text-white" />
                 </div>
 
