@@ -21,7 +21,7 @@ export const auth = betterAuth({
   secret:process.env.BETTER_AUTH_SECRET!,
   advanced:{
     cookies:{
-        sessio_token:{
+          session_token:{
             name:'auth_session',
             attributes:{
                 httpOnly:true,
