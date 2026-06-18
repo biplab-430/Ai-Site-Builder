@@ -2,7 +2,7 @@
 
 An AI-powered full-stack platform that generates **fully functional websites from plain English prompts**. Built with the **PERN Stack + TypeScript** following a **Monolithic Architecture** with modular service layers, a credit-based usage system, and **Stripe payment integration**.
 
-🔗 **GitHub:** [biplab-430/Ai-Site-Builder](https://github.com/biplab-430/Ai-Site-Builder)
+Live Demo:https://ai-site-builder-sandy.vercel.app/
 
 ---
 
