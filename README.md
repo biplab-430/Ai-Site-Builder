@@ -528,7 +528,7 @@ This project is licensed under the **ISC License**.
 
 <div align="center">
 
-**Built with ❤️ by [Your Name](https://github.com/yourusername)**
+**Built with ❤️ by [Biplab Ghosh](https://github.com/biplab-430)**
 
 ⭐ If you found this helpful, consider starring the repo!
 
