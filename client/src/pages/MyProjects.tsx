@@ -55,7 +55,7 @@ const MyProjects: React.FC = () => {
 
   return (
     <>
-      <div className="px-4 md:px-16 lg:px-24 xl:px-32">
+      <div className="px-4 md:px-16 lg:px-24 xl:px-32 animate-fade-in-up">
         {loading ? (
           <div className="flex items-center justify-center h-[80vh]">
             <Loader2Icon className="size-7 animate-spin text-indigo-300" />
@@ -71,8 +71,8 @@ const MyProjects: React.FC = () => {
               <button
                 onClick={() => navigate("/")}
                 className="flex items-center gap-2 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded
-                 bg-gradient-to-br from-indigo-500 to-indigo-600
-                 hover:opacity-90 active:scale-95 transition-all"
+                 bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600
+                 hover-interactive shadow-lg shadow-indigo-500/20 font-medium"
               >
                 <PlusIcon size={18} />
                 Create New
@@ -86,9 +86,9 @@ const MyProjects: React.FC = () => {
                   onClick={() => navigate(`/projects/${project.id}`)}
                   key={project.id}
                   className="relative group w-72 max-sm:mx-auto cursor-pointer
-                  bg-gray-900/60 border border-gray-700 rounded-lg overflow-hidden
-                  shadow-md hover:shadow-indigo-700/30 hover:border-indigo-800/80
-                  transition-all duration-300"
+                  bg-gradient-to-br from-slate-900/85 via-gray-900/60 to-slate-950/85 border border-gray-800/80 rounded-lg overflow-hidden
+                  shadow-md hover:shadow-indigo-500/15 hover:border-indigo-500/50 hover:scale-105 hover:brightness-[1.03] active:scale-[0.98]
+                  transition-all duration-300 ease-out"
                 >
                   {/* Preview */}
                   <div className="relative w-full h-40 bg-gray-900 overflow-hidden border-b border-gray-800">
@@ -116,7 +116,7 @@ const MyProjects: React.FC = () => {
                         {project.name}
                       </h2>
 
-                      <button className="px-2.5 py-0.5 mt-1 ml-2 text-[10px] bg-gray-800 border border-gray-700 rounded-full">
+                      <button className="px-2.5 py-0.5 mt-1 ml-2 text-[10px] bg-gray-800 border border-gray-700 rounded-full cursor-default">
                         Website
                       </button>
                     </div>
@@ -140,7 +140,7 @@ const MyProjects: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/preview/${project.id}`);
                         }}
-                        className="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-md transition-all flex items-center gap-2"
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 hover:scale-105 active:scale-95 rounded-md transition-all flex items-center gap-2 font-medium"
                       >
                         Preview
                       </button>
@@ -150,7 +150,7 @@ const MyProjects: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/projects/${project.id}`);
                         }}
-                        className="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-md transition-all flex items-center gap-2"
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 hover:scale-105 active:scale-95 rounded-md transition-all flex items-center gap-2 font-medium"
                       >
                         Open In Chat
                       </button>
@@ -176,7 +176,7 @@ const MyProjects: React.FC = () => {
 
             <button
               onClick={() => navigate("/")}
-              className="text-white px-5 py-2 mt-5 rounded-md bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all"
+              className="text-white px-5 py-2 mt-5 rounded-md bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600 hover-interactive font-medium shadow-lg shadow-indigo-500/20"
             >
               Create New
             </button>

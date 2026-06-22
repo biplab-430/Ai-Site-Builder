@@ -212,10 +212,10 @@ const Sidebar = ({
 
                 const ver = message as Version;
 
-                return (
+                 return (
                   <div
                     key={ver.id}
-                    className="w-4/5 mx-auto my-2 p-3 rounded-xl bg-gray-800 text-gray-100 shadow flex flex-col gap-2"
+                    className="w-4/5 mx-auto my-2 p-3 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 text-gray-100 shadow flex flex-col gap-2 transition-all hover:border-indigo-500/30"
                   >
                     <div className="text-xs font-medium">
                       Code Update
@@ -241,7 +241,7 @@ const Sidebar = ({
                             )
                           }
                           disabled={isGenerating}
-                          className="px-3 py-1 rounded-md text-xs bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50"
+                          className="px-3 py-1 rounded-md text-xs bg-gradient-to-r from-indigo-500 to-indigo-600 hover-interactive font-medium disabled:opacity-50 shadow-sm"
                         >
                           Roll Back
                         </button>
@@ -250,6 +250,7 @@ const Sidebar = ({
                       <Link
                         target="_blank"
                         to={`/preview/${project.id}/${ver.id}`}
+                        className="hover:scale-105 active:scale-95 transition-transform"
                       >
                         <EyeIcon className="size-6 p-1 bg-gray-700 hover:bg-indigo-500 transition-colors rounded" />
                       </Link>
@@ -313,7 +314,7 @@ const Sidebar = ({
                   isGenerating ||
                   !input.trim()
                 }
-                className="absolute bottom-2.5 right-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white transition-colors disabled:opacity-60"
+                className="absolute bottom-2.5 right-2.5 rounded-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600 hover-interactive text-white transition-all disabled:opacity-60"
               >
                 {isGenerating ? (
                   <Loader2Icon className="size-7 p-1.5 animate-spin text-white" />

@@ -137,28 +137,26 @@ const Projects = () => {
           </div>
         </div>
         {/* middle */}
-        <div className='hidden sm:flex gap-2 bg-gray-950 p-1.5 rounded-md'>
-          <SmartphoneIcon onClick={() => setDevice('phone')} className={`size-6 p-1 rounded cursor-pointer ${device === 'phone' ? "bg-gray-700" : ""}`} />
-          <Tablet onClick={() => setDevice('tablet')} className={`size-6 p-1 rounded cursor-pointer ${device === 'tablet' ? "bg-gray-700" : ""}`} />
-          <Laptop onClick={() => setDevice('desktop')} className={`size-6 p-1 rounded cursor-pointer ${device === 'desktop' ? "bg-gray-700" : ""}`} />
+        <div className='hidden sm:flex gap-2 bg-gray-950 p-1.5 rounded-md border border-slate-800/80'>
+          <SmartphoneIcon onClick={() => setDevice('phone')} className={`size-6 p-1 rounded cursor-pointer transition-all hover:scale-105 active:scale-95 ${device === 'phone' ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`} />
+          <Tablet onClick={() => setDevice('tablet')} className={`size-6 p-1 rounded cursor-pointer transition-all hover:scale-105 active:scale-95 ${device === 'tablet' ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`} />
+          <Laptop onClick={() => setDevice('desktop')} className={`size-6 p-1 rounded cursor-pointer transition-all hover:scale-105 active:scale-95 ${device === 'desktop' ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"}`} />
         </div>
         {/* right */}
         <div className='flex items-center justify-end gap-3 flex-1 text-xs sm:text-sm'>
-          <button onClick={saveProject} disabled={isSaving} className='max-sm:hidden bg-gray-800 hover:bg-gray-700 text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-colors border border-gray-700'>
+          <button onClick={saveProject} disabled={isSaving} className='max-sm:hidden bg-gray-850 hover:bg-gray-800 hover:border-gray-500 hover:scale-105 active:scale-95 text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-all border border-gray-700'>
             {isSaving ? <Loader2Icon className='animate-spin' size={16} /> : <SaveIcon size={16} />}  Save
           </button>
           
-          <Link target='_blank' to={`/preview/${projectId}`} className='flex items-center gap-2 px-4 py-1 rounded sm:rounded-sm border border-gray-700 hover:border-gray-500 transition-colors'>
+          <Link target='_blank' to={`/preview/${projectId}`} className='flex items-center gap-2 px-4 py-1 rounded sm:rounded-sm border border-gray-700 hover:border-gray-500 hover:scale-105 active:scale-95 transition-all text-gray-300 hover:text-white'>
             <Fullscreen size={16} />  Preview
           </Link>
 
-          {/* UI FIX: Updated to bg-gradient-to-br */}
-          <button onClick={downloadCode} className='bg-gradient-to-br from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-colors'>
+          <button onClick={downloadCode} className='bg-gradient-to-r from-blue-600 to-indigo-600 hover-interactive text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-all shadow-md shadow-blue-500/10 font-medium'>
             <ArrowBigDownDashIcon size={16} />  Download
           </button>
 
-          {/* UI FIX: Updated to bg-gradient-to-br */}
-          <button onClick={togglePublish} className='bg-gradient-to-br from-indigo-700 to-indigo-600 hover:from-indigo-600 hover:to-indigo-500 text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-colors'>
+          <button onClick={togglePublish} className='bg-gradient-to-r from-[#CB52D4] to-indigo-600 hover-interactive text-white px-3.5 py-1 flex items-center gap-2 rounded sm:rounded-sm transition-all shadow-md shadow-indigo-500/10 font-medium'>
             {project.isPublished ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
             {project.isPublished ? "Unpublish" : "Publish"}
           </button>

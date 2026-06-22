@@ -1,101 +1,87 @@
 // controller func to rev the code
 import prisma from "../lib/prisma.js";
-import ai from "../Configs/Gemini.js";
-export const generateWithFallbackAndRetry = async (contents, systemInstruction, retries = 3) => {
-    // Define your model hierarchy (preferred first, fallbacks next)
-    const models = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash",
-    ];
-    // Outer Loop: Iterate through the available models
-    for (const model of models) {
-        console.log(`\n--- Activating model: ${model} ---`);
-        // Inner Loop: Handle retries for the currently selected model
-        for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-                // If successful, this returns the payload and exits both loops
-                return await ai.models.generateContent({
-                    model,
-                    config: { systemInstruction },
-                    contents,
-                });
-            }
-            catch (error) {
-                console.error(`[${model}] Attempt ${attempt} failed.`);
-                console.error("Status:", error?.status);
-                console.error("Message:", error?.message);
-                // Scenario A: Transient Error (503). Wait and retry the SAME model.
-                if (error?.status === 503 && attempt < retries) {
-                    const delayMs = attempt * 3000;
-                    console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
-                    await new Promise((resolve) => setTimeout(resolve, delayMs));
-                    continue; // Skips to the next iteration of the inner loop
-                }
-                // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
-                // Break out of the inner retry loop to switch to the NEXT model.
-                console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
-                break;
-            }
-        }
-    }
-    // If the code execution reaches this point, all models and all retries have failed.
-    throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
-};
+import { generateWithFallbackAndRetry } from '../lib/Fallback.js';
+// export const generateWithFallbackAndRetry = async (
+//   contents: string,
+//   systemInstruction: string,
+//   retries = 3
+// ) => {
+//   // Define your model hierarchy (preferred first, fallbacks next)
+//   const models = [
+//     "gemini-2.5-flash",
+//     "gemini-2.5-flash-lite",
+//     "gemini-2.0-flash",
+//   ];
+//   // Outer Loop: Iterate through the available models
+//   for (const model of models) {
+//     console.log(`\n--- Activating model: ${model} ---`);
+//     // Inner Loop: Handle retries for the currently selected model
+//     for (let attempt = 1; attempt <= retries; attempt++) {
+//       try {
+//         // If successful, this returns the payload and exits both loops
+//         return await ai.models.generateContent({
+//           model,
+//           config: { systemInstruction },
+//           contents,
+//         });
+//       } catch (error: any) {
+//         console.error(`[${model}] Attempt ${attempt} failed.`);
+//         console.error("Status:", error?.status);
+//         console.error("Message:", error?.message);
+//         // Scenario A: Transient Error (503). Wait and retry the SAME model.
+//         if (error?.status === 503 && attempt < retries) {
+//           const delayMs = attempt * 3000;
+//           console.log(`Applying backoff. Waiting ${delayMs}ms before retrying ${model}...`);
+//           await new Promise((resolve) => setTimeout(resolve, delayMs));
+//           continue; // Skips to the next iteration of the inner loop
+//         }
+//         // Scenario B: Fatal Error (400, 429) OR retries are exhausted.
+//         // Break out of the inner retry loop to switch to the NEXT model.
+//         console.warn(`Abandoning ${model}. Switching to next fallback in queue...`);
+//         break; 
+//       }
+//     }
+//   }
+//   // If the code execution reaches this point, all models and all retries have failed.
+//   throw new Error("Critical Failure: All models and retry attempts have been exhausted.");
+// };
 export const makeRevision = async (req, res) => {
     const userId = req.userId;
     let creditsDeducted = false;
     try {
-        const { projectId } = req.params;
+        const projectId = req.params.projectId;
         const { message } = req.body;
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-        });
-        if (!userId || !user) {
-            return res.status(401).json({
-                message: "unauthorized",
-            });
+        // Guard userId before any DB call (FIX LB-03)
+        if (!userId) {
+            return res.status(401).json({ message: "unauthorized" });
         }
-        if (user.credits < 5) {
-            return res.status(403).json({
-                message: "add more credit",
-            });
-        }
+        // Validate message early so we don't waste a DB round-trip on an empty prompt
         if (!message || message.trim() === "") {
-            return res.status(400).json({
-                message: "please enter a valid prompt",
-            });
+            return res.status(400).json({ message: "please enter a valid prompt" });
         }
+        // ATOMIC credit deduction (FIX LB-01):
+        // updateMany atomically checks credits >= 2 AND decrements in a single DB operation.
+        // This eliminates the TOCTOU race condition where concurrent requests could both
+        // pass a separate findUnique check and each deduct credits independently.
+        const creditResult = await prisma.user.updateMany({
+            where: { id: userId, credits: { gte: 2 } },
+            data: { credits: { decrement: 2 } },
+        });
+        if (creditResult.count === 0) {
+            // Either the user does not exist or has fewer than 2 credits.
+            return res.status(403).json({ message: "Insufficient credits" });
+        }
+        creditsDeducted = true;
         const currentProject = await prisma.websiteProject.findUnique({
-            where: {
-                id: projectId,
-                userId,
-            },
-            include: {
-                versions: true,
-            },
+            where: { id: projectId, userId },
+            include: { versions: true },
         });
         if (!currentProject) {
-            return res.status(404).json({
-                message: "project not found",
-            });
+            return res.status(404).json({ message: "project not found" });
         }
         await prisma.conversation.create({
-            data: {
-                role: "user",
-                content: message,
-                projectId,
-            },
+            data: { role: "user", content: message, projectId },
         });
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                credits: {
-                    decrement: 5,
-                },
-            },
-        });
-        creditsDeducted = true;
         // STEP 1: Enhance Prompt
         const enhancedPromptResponse = await generateWithFallbackAndRetry(`User request: ${message}`, `
 You are a prompt enhancement specialist.
@@ -165,7 +151,7 @@ Requirements:
                 where: { id: userId },
                 data: {
                     credits: {
-                        increment: 5,
+                        increment: 2,
                     },
                 },
             });
@@ -216,7 +202,7 @@ Requirements:
                     where: { id: userId },
                     data: {
                         credits: {
-                            increment: 5,
+                            increment: 2,
                         },
                     },
                 });
@@ -241,7 +227,8 @@ export const rollBackToVersion = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ message: "unauthorized" });
         }
-        const { projectId, versionId } = req.params;
+        const projectId = req.params.projectId;
+        const versionId = req.params.versionId;
         if (!projectId || !versionId) {
             return res
                 .status(400)
@@ -292,7 +279,7 @@ export const rollBackToVersion = async (req, res) => {
 export const deleteProject = async (req, res) => {
     try {
         const userId = req.userId;
-        const { projectId } = req.params;
+        const projectId = req.params.projectId;
         if (!userId) {
             return res.status(401).json({ message: "unauthorized" });
         }
@@ -313,7 +300,7 @@ export const deleteProject = async (req, res) => {
 export const getProjectPreview = async (req, res) => {
     try {
         const userId = req.userId;
-        const { projectId } = req.params;
+        const projectId = req.params.projectId;
         if (!userId) {
             return res.status(401).json({ message: "unauthorized" });
         }
@@ -339,7 +326,11 @@ export const getPublishProject = async (req, res) => {
     try {
         const projects = await prisma.websiteProject.findMany({
             where: { isPublished: true },
-            include: { user: true }
+            // FIX (LB-07): Scope user fields to only what the community page needs.
+            // Previously `include: { user: true }` leaked email, credits, and other PII.
+            include: {
+                user: { select: { name: true } }
+            }
         });
         res.json({ projects });
     }
@@ -354,10 +345,11 @@ export const getPublishProject = async (req, res) => {
 // get a single project by id
 export const getProjectById = async (req, res) => {
     try {
-        const { projectId } = req.params;
+        const projectId = req.params.projectId;
         const project = await prisma.websiteProject.findUnique({
             where: { id: projectId },
-            include: { user: true }
+            // FIX (LB-08): Removed `include: { user: true }` — the user record was loaded
+            // but never sent in the response, creating a needless DB join and a PII risk.
         });
         if (!project || project.isPublished === false || !project.current_code) {
             return res.status(404).json({ message: "project not found" });
@@ -376,7 +368,7 @@ export const getProjectById = async (req, res) => {
 export const saveProjectCode = async (req, res) => {
     try {
         const userId = req.userId;
-        const { projectId } = req.params;
+        const projectId = req.params.projectId;
         const { code } = req.body;
         if (!userId) {
             return res.status(401).json({ message: "unauthorized" });

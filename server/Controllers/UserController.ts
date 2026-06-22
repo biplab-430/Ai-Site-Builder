@@ -1,9 +1,10 @@
-import {Request,Response} from 'express'
+import { Request, Response } from 'express'
 import prisma from '../lib/prisma.js';
 import openai from '../Configs/OpenAi.js';
 import ai from '../Configs/Gemini.js';
-import {searchPexelsImages} from '../lib/helperImage.js'
-import {generateWithFallbackAndRetry} from '../lib/Fallback.js'
+import { searchPexelsImages } from '../lib/helperImage.js'
+import { generateWithFallbackAndRetry } from '../lib/Fallback.js'
+import Stripe from 'stripe';
 
 
 
@@ -11,22 +12,22 @@ import {generateWithFallbackAndRetry} from '../lib/Fallback.js'
 
 
 // user credits
-export const getUserCredits=async(req:Request,res:Response)=>{
-    try {
-        const userId=req.userId;
-        if(!userId){
-            return res.status(401).json({message:"unauthorized"})
-        }
-        const user=await prisma.user.findUnique({
-            where:{id:userId}
-        })
-        if(!user){
-            return res.status(404).json({message:"User not found"})
-        }
-        res.json({credits:user?.credits})
-    }catch (error: any) {
-        return res.status(500).json({message:"Internal server error", error:error.message})
+export const getUserCredits = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" })
     }
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+    res.json({ credits: user?.credits })
+  } catch (error: any) {
+    return res.status(500).json({ message: "Internal server error", error: error.message })
+  }
 }
 
 // create new project
@@ -45,15 +46,24 @@ export const CreateUserProject = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid prompt" });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // ATOMIC credit deduction (FIX LB-01 / CS-02):
+    // updateMany atomically checks credits >= 5 AND decrements in a single DB operation.
+    // This eliminates the TOCTOU race condition where concurrent requests could both
+    // pass a separate findUnique check and each deduct credits independently.
+    const creditResult = await prisma.user.updateMany({
+      where: { id: userId, credits: { gte: 5 } },
+      data: {
+        credits: { decrement: 5 },
+        totalCreation: { increment: 1 },
+      },
     });
 
-    if (!user || user.credits < 5) {
-      return res.status(403).json({
-        message: "Insufficient credits",
-      });
+    if (creditResult.count === 0) {
+      // Either the user does not exist or has fewer than 5 credits.
+      return res.status(403).json({ message: "Insufficient credits" });
     }
+
+    creditsDeducted = true;
 
     const project = await prisma.websiteProject.create({
       data: {
@@ -73,20 +83,6 @@ export const CreateUserProject = async (req: Request, res: Response) => {
         projectId: project.id,
       },
     });
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        credits: {
-          decrement: 5,
-        },
-        totalCreation: {
-          increment: 1,
-        },
-      },
-    });
-
-    creditsDeducted = true;
 
     // STEP 1: Enhance Prompt
     const promptEnhancedResponse = await generateWithFallbackAndRetry(
@@ -110,11 +106,11 @@ Return ONLY the enhanced prompt.
     if (!enhancedPrompt) {
       throw new Error("Prompt enhancement failed");
     }
-// for image generation properly 
-const imageKeywordResponse =
-  await generateWithFallbackAndRetry(
-    enhancedPrompt,
-    `
+    // for image generation properly 
+    const imageKeywordResponse =
+      await generateWithFallbackAndRetry(
+        enhancedPrompt,
+        `
 Return ONLY one highly specific image search keyword.
 
 Examples:
@@ -125,18 +121,18 @@ Portfolio website -> software developer
 
 Return only the keyword.
 `
-  );
+      );
 
-const imageKeyword =
-  imageKeywordResponse.text?.trim() || "business";
+    const imageKeyword =
+      imageKeywordResponse.text?.trim() || "business";
 
-  const imageUrls = await searchPexelsImages(
-  imageKeyword,
-  8
-);
+    const imageUrls = await searchPexelsImages(
+      imageKeyword,
+      8
+    );
 
-console.log("Image Keyword:", imageKeyword);
-console.log("Pexels Images:", imageUrls);
+    console.log("Image Keyword:", imageKeyword);
+    console.log("Pexels Images:", imageUrls);
 
 
     await prisma.conversation.create({
@@ -164,8 +160,8 @@ You are an expert frontend web developer.
 AVAILABLE IMAGES:
 
 ${imageUrls
-  .map((url: string, index: number) => `Image ${index + 1}: ${url}`)
-  .join("\n")}
+        .map((url: string, index: number) => `Image ${index + 1}: ${url}`)
+        .join("\n")}
 
 Requirements:
 
@@ -195,24 +191,24 @@ IMAGE RULES:
     const rawCode = codeGenerationResponse.text?.trim();
 
     if (!rawCode) {
-        await prisma.conversation.create({
-      data: {
-        role: "assistant",
-        content:
-          "unable to generate the code please try again later",
-        projectId:project.id
-      },
-    });
-     await prisma.user.update({
-          where: { id: userId },
-          data: {
-            credits: {
-              increment: 5,
-            },
+      await prisma.conversation.create({
+        data: {
+          role: "assistant",
+          content:
+            "unable to generate the code please try again later",
+          projectId: project.id
+        },
+      });
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          credits: {
+            increment: 5,
           },
-        });
+        },
+      });
 
-        return ;
+      return;
     }
 
     const cleanedCode = rawCode
@@ -285,50 +281,55 @@ IMAGE RULES:
 
 
 // to get a single project
-export const getUserProject=async(req:Request,res:Response)=>{
-    try {
-        const userId=req.userId;
-        if(!userId){
-            return res.status(401).json({message:"unauthorized"})
-        }
-        const projectId = req.params.projectId as string;
-       const project=await prisma.websiteProject.findUnique({
-       where:{id:projectId,userId:userId},
-       include:{
-        conversation:{
-            orderBy:{timestamp:'asc'}
-        },
-        versions:{
-            orderBy:{timestamp:'asc'}
-        }
-       }
-
-       })
-       res.json({project})
-    }catch (error: any) {
-        return res.status(500).json({message:"Internal server error", error:error.message})
+export const getUserProject = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" })
     }
+    const projectId = req.params.projectId as string;
+    const project = await prisma.websiteProject.findUnique({
+      where: { id: projectId, userId: userId },
+      include: {
+        conversation: {
+          orderBy: { timestamp: 'asc' }
+        },
+        versions: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
+    })
+
+    // FIX (LB-05): Return 404 instead of HTTP 200 with { project: null }
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" })
+    }
+
+    res.json({ project })
+  } catch (error: any) {
+    return res.status(500).json({ message: "Internal server error", error: error.message })
+  }
 }
 
 // to get all users project
-export const getUserAllProjects=async(req:Request,res:Response)=>{
-    try {
-        const userId=req.userId;
-        if(!userId){
-            return res.status(401).json({message:"unauthorized"})
-        }
-
-       
-
-       const projects=await prisma.websiteProject.findMany({
-       where:{userId:userId},
-      orderBy:{updatedAt:'desc'},
-
-       })
-       res.json({projects})
-    }catch (error: any) {
-        return res.status(500).json({message:"Internal server error", error:error.message})
+export const getUserAllProjects = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" })
     }
+
+
+
+    const projects = await prisma.websiteProject.findMany({
+      where: { userId: userId },
+      orderBy: { updatedAt: 'desc' },
+
+    })
+    res.json({ projects })
+  } catch (error: any) {
+    return res.status(500).json({ message: "Internal server error", error: error.message })
+  }
 }
 
 // toggle project publish
@@ -366,7 +367,7 @@ export const toggleProjectPublish = async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(401).json({ message: "unauthorized" });
     }
-  const projectId = req.params.projectId as string;
+    const projectId = req.params.projectId as string;
 
     const project = await prisma.websiteProject.findUnique({
       where: { id: projectId, userId: userId },
@@ -392,21 +393,86 @@ export const toggleProjectPublish = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    return res.status(500).json({ 
-      message: "Internal server error", 
-      error: error.message 
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message
     });
   }
 };
 // to purchase credits
 
-export const purchaseCredits=async(req:Request,res:Response)=>{
-    try {
-      
-
-    }catch (error: any) {
-        return res.status(500).json({message:"Internal server error", error:error.message})
+export const purchaseCredits = async (req: Request, res: Response) => {
+  try {
+    interface Plan {
+      credits: number;
+      amount: number;
     }
+
+    const plans = {
+      basic: { credits: 100, amount: 5 },
+      pro: { credits: 400, amount: 19 },
+      enterprise: { credits: 1000, amount: 49 }
+    }
+
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" })
+    }
+
+    const { planId } = req.body as { planId: keyof typeof plans }
+
+    // FIX (CS-04): Never trust req.headers.origin — it is user-controlled and can be spoofed.
+    // Use a server-side env variable so redirect URLs are always to our own frontend.
+    const origin = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+    const plan: Plan = plans[planId]
+
+    if (!plan) {
+      return res.status(404).json({ message: "plan not found" })
+    }
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        userId: userId!,
+        planId: req.body.planId,
+        amount: plan.amount,
+        credits: plan.credits
+      }
+    })
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
+
+    const session = await stripe.checkout.sessions.create({
+      success_url: `${origin}/loading`,
+      cancel_url:`${origin}`,
+      line_items: [
+        {
+          price_data:{
+            currency:'usd',
+            product_data:{
+              name:`AiSiteBuilder -${plan.credits} credits`
+            },
+            unit_amount:Math.floor(transaction.amount)*100
+          },
+          quantity:1
+        },
+      ],
+      mode: 'payment',
+      metadata:{
+        transactionId:transaction.id,
+        appId:'ai-site-builder'
+      },
+      expires_at:Math.floor(Date.now()/1000)+30*60
+    });
+
+    res.json({
+      payment_link:session.url
+    })
+
+
+  } catch (error: any) {
+    return res.status(500).json({ message: "payment failed", error: error.message })
+  }
 }
 
 // get conversation of all
@@ -415,7 +481,7 @@ export const purchaseCredits=async(req:Request,res:Response)=>{
 export const getConversation = async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
-    
+
     if (!userId) {
       return res.status(401).json({ message: "unauthorized" });
     }
@@ -428,9 +494,9 @@ export const getConversation = async (req: Request, res: Response) => {
 
     // 1. Verify the project exists AND belongs to the requesting user
     const project = await prisma.websiteProject.findUnique({
-      where: { 
-        id: projectId, 
-        userId: userId 
+      where: {
+        id: projectId,
+        userId: userId
       },
     });
 
@@ -440,26 +506,26 @@ export const getConversation = async (req: Request, res: Response) => {
 
     // 2. Fetch the conversation history for this project
     const conversation = await prisma.conversation.findMany({
-      where: { 
-        projectId: projectId 
+      where: {
+        projectId: projectId
       },
-      orderBy: { 
+      orderBy: {
         timestamp: 'asc' // Orders from oldest to newest so the chat flows correctly
       },
     });
 
     // 3. Return the conversation array
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
-      conversation 
+      conversation
     });
 
   } catch (error: any) {
     console.error("Fetch Conversation Error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: "Internal server error", 
-      error: error.message 
+      message: "Internal server error",
+      error: error.message
     });
   }
 };

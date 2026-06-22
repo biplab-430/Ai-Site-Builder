@@ -67,66 +67,48 @@ export const makeRevision = async (
   let creditsDeducted = false;
 
   try {
-   const projectId = req.params.projectId as string;
+    const projectId = req.params.projectId as string;
     const { message } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // Guard userId before any DB call (FIX LB-03)
+    if (!userId) {
+      return res.status(401).json({ message: "unauthorized" });
+    }
+
+    // Validate message early so we don't waste a DB round-trip on an empty prompt
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ message: "please enter a valid prompt" });
+    }
+
+    // ATOMIC credit deduction (FIX LB-01):
+    // updateMany atomically checks credits >= 2 AND decrements in a single DB operation.
+    // This eliminates the TOCTOU race condition where concurrent requests could both
+    // pass a separate findUnique check and each deduct credits independently.
+    const creditResult = await prisma.user.updateMany({
+      where: { id: userId, credits: { gte: 2 } },
+      data: { credits: { decrement: 2 } },
     });
 
-    if (!userId || !user) {
-      return res.status(401).json({
-        message: "unauthorized",
-      });
+    if (creditResult.count === 0) {
+      // Either the user does not exist or has fewer than 2 credits.
+      return res.status(403).json({ message: "Insufficient credits" });
     }
 
-    if (user.credits < 2) {
-      return res.status(403).json({
-        message: "add more credit",
-      });
-    }
+    creditsDeducted = true;
 
-    if (!message || message.trim() === "") {
-      return res.status(400).json({
-        message: "please enter a valid prompt",
-      });
-    }
-
-    const currentProject =
-      await prisma.websiteProject.findUnique({
-        where: {
-          id: projectId,
-          userId,
-        },
-        include: {
-          versions: true,
-        },
-      });
+    const currentProject = await prisma.websiteProject.findUnique({
+      where: { id: projectId, userId },
+      include: { versions: true },
+    });
 
     if (!currentProject) {
-      return res.status(404).json({
-        message: "project not found",
-      });
+      return res.status(404).json({ message: "project not found" });
     }
 
     await prisma.conversation.create({
-      data: {
-        role: "user",
-        content: message,
-        projectId,
-      },
+      data: { role: "user", content: message, projectId },
     });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        credits: {
-          decrement: 2,
-        },
-      },
-    });
-
-    creditsDeducted = true;
 // STEP 1: Enhance Prompt
 
 const enhancedPromptResponse =
@@ -432,14 +414,18 @@ export const getProjectPreview = async (req: Request, res: Response) => {
 }
 
 // get publish project
-export const getPublishProject=async(req: Request, res: Response)=>{
+export const getPublishProject = async (req: Request, res: Response) => {
   try {
     const projects = await prisma.websiteProject.findMany({
-      where: { isPublished:true },
-     include:{user:true}
+      where: { isPublished: true },
+      // FIX (LB-07): Scope user fields to only what the community page needs.
+      // Previously `include: { user: true }` leaked email, credits, and other PII.
+      include: {
+        user: { select: { name: true } }
+      }
     })
 
-   res.json({projects})
+    res.json({ projects })
 
   } catch (error: any) {
     console.error(error.code)
@@ -451,18 +437,19 @@ export const getPublishProject=async(req: Request, res: Response)=>{
   }
 }
 // get a single project by id
-export const getProjectById=async(req: Request, res: Response)=>{
+export const getProjectById = async (req: Request, res: Response) => {
   try {
     const projectId = req.params.projectId as string;
     const project = await prisma.websiteProject.findUnique({
       where: { id: projectId },
-      include:{user:true}
+      // FIX (LB-08): Removed `include: { user: true }` — the user record was loaded
+      // but never sent in the response, creating a needless DB join and a PII risk.
     })
-     if (!project || project.isPublished===false || !project.current_code) {
+    if (!project || project.isPublished === false || !project.current_code) {
       return res.status(404).json({ message: "project not found" })
     }
 
-   res.json({code:project.current_code})
+    res.json({ code: project.current_code })
 
   } catch (error: any) {
     console.error(error.code)

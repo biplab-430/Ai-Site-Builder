@@ -22,9 +22,34 @@
   100% {opacity: 1;}
 }
 
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fade-in{
   animation: fade-in 0.8s ease-out;
+}
 
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hover-interactive {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-interactive:hover {
+  transform: scale(1.05);
+  filter: brightness(1.15);
+}
+.hover-interactive:active {
+  transform: scale(0.95);
 }
 
 @theme inline {

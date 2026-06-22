@@ -56,16 +56,16 @@ const Home = () => {
 
   // If Loading is false, return your normal UI
   return (
-    <section className="flex flex-col items-center text-white text-sm pb-20 px-4 font-poppins">
-      <h1 className="text-center text-[40px] leading-12 b md:text-6xl md:leading-[70px] mt-4 font-semibold max-w-3xl">
+    <section className="flex flex-col items-center text-white text-sm pb-20 px-4 font-poppins animate-fade-in-up">
+      <h1 className="text-center text-[40px] leading-12 md:text-6xl md:leading-[70px] mt-4 font-semibold max-w-3xl bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
         Turn thoughts into Websites Instantly, With AI
       </h1>
 
-      <p className="text-center text-base max-w-md mt-2">
+      <p className="text-center text-base max-w-md mt-2 text-gray-300">
         Customise and Publish Website Faster Than Ever with Our AI-Site Builder
       </p>
 
-      <form onSubmit={onSubmitHandler} className="bg-white/10 max-w-2xl w-full rounded-xl p-4 mt-10 border border-indigo-600/70 focus-within:ring-2 ring-indigo-500 transition-all">
+      <form onSubmit={onSubmitHandler} className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md max-w-2xl w-full rounded-xl p-4 mt-10 border border-indigo-500/40 hover:border-indigo-500/60 focus-within:ring-2 focus-within:ring-indigo-500 transition-all duration-300 shadow-xl hover:shadow-indigo-500/10">
         <textarea 
           onChange={e => setInput(e.target.value)} 
           className="bg-transparent outline-none text-gray-300 resize-none w-full" 
@@ -73,7 +73,7 @@ const Home = () => {
           placeholder="Describe your presentation in details" 
           required 
         />
-        <button className="ml-auto flex items-center gap-2 bg-linear-to-r from-[#CB52D4] to-indigo-600 rounded-md px-4 py-2 hover:opacity-90 transition-opacity">
+        <button className="ml-auto flex items-center gap-2 bg-gradient-to-r from-[#CB52D4] to-indigo-600 rounded-md px-4 py-2 hover-interactive shadow-lg shadow-indigo-500/20 font-medium">
           Create with AI
         </button>
       </form>

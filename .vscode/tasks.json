@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install dependencies (client & server)",
+      "type": "shell",
+      "command": "npm install && cd server && npm install && cd ../client && npm install",
+      "inAgents": true,
+      "runOptions": { "runOn": "worktreeCreated" },
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "Start client dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/client",
+      "inAgents": true,
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start server",
+      "type": "shell",
+      "command": "npm run server",
+      "cwd": "${workspaceFolder}/server",
+      "inAgents": true,
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import Navbar from './componenets/Navbar'
 import { Toaster } from "@/components/ui/sonner"
 import AuthPage from './pages/auth/AuthPage'
 import Settings from './pages/Settings'
+import Loading from './pages/loading'
 
 
 function App() {
@@ -33,6 +34,7 @@ const hideNavbar=pathname.startsWith('/projects/') && pathname!=='/projects' || 
         <Route path='/view/:projectId' element={<View/>}/>
         <Route path="/auth/:pathname" element={<AuthPage />} />
         <Route path="/account/settings" element={<Settings />} />
+        <Route path="/loading" element={<Loading />} />
       </Routes>
     </div>
   )
