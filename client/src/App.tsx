@@ -11,7 +11,9 @@ import Navbar from './componenets/Navbar'
 import { Toaster } from "@/components/ui/sonner"
 import AuthPage from './pages/auth/AuthPage'
 import Settings from './pages/Settings'
-import Loading from './pages/loading'
+import Loading from './pages/LoadingState'
+
+
 
 
 
