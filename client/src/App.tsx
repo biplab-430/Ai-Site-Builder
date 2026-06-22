@@ -14,10 +14,11 @@ import Settings from './pages/Settings'
 import Loading from './pages/loading'
 
 
+
 function App() {
  
 const {pathname}=useLocation();
-const hideNavbar=pathname.startsWith('/projects/') && pathname!=='/projects' || pathname.startsWith('/view/') || pathname.startsWith('/preview/')
+const hideNavbar=pathname.startsWith('/projects/') && pathname!=='/projects' || pathname.startsWith('/view/') || pathname.startsWith('/preview/') || pathname.startsWith('/loading/')
 
   return (
     <div>
@@ -34,7 +35,7 @@ const hideNavbar=pathname.startsWith('/projects/') && pathname!=='/projects' || 
         <Route path='/view/:projectId' element={<View/>}/>
         <Route path="/auth/:pathname" element={<AuthPage />} />
         <Route path="/account/settings" element={<Settings />} />
-        <Route path="/loading" element={<Loading />} />
+        <Route path="/loading" element={<Loading/>} />
       </Routes>
     </div>
   )
