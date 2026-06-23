@@ -25,9 +25,9 @@ export const aiLimiter = rateLimit({
   standardHeaders: 'draft-7', // Emit RFC-compliant RateLimit-* response headers
   legacyHeaders: false,       // Suppress deprecated X-RateLimit-* headers
 
-  // 👉 FIXED: Added 'res' to parameters and used ipKeyGenerator
+  // 👉 FIXED: Pass req.ip (string) instead of req (Request)
   keyGenerator: (req: Request, res: Response) =>
-    (req as any).userId ?? ipKeyGenerator(req, res) ?? 'anonymous',
+    (req as any).userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'anonymous'),
 
   handler: (_req, res) => {
     res.status(429).json({
@@ -54,9 +54,9 @@ export const purchaseLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 
-  // 👉 FIXED: Added 'res' to parameters and used ipKeyGenerator
+  // 👉 FIXED: Pass req.ip (string) instead of req (Request)
   keyGenerator: (req: Request, res: Response) =>
-    (req as any).userId ?? ipKeyGenerator(req, res) ?? 'anonymous',
+    (req as any).userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'anonymous'),
 
   handler: (_req, res) => {
     res.status(429).json({
