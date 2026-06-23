@@ -1,5 +1,5 @@
-import rateLimit from 'express-rate-limit';
-import type { Request } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import type { Request, Response } from 'express';
 
 /**
  * Rate limiter for AI generation endpoints.
@@ -16,8 +16,8 @@ import type { Request } from 'express';
  * bypassed the protect middleware), and to 'anonymous' as a last resort.
  *
  * Applied to:
- *   POST /api/user/project            → CreateUserProject
- *   POST /api/project/revision/:id    → makeRevision
+ * POST /api/user/project            → CreateUserProject
+ * POST /api/project/revision/:id    → makeRevision
  */
 export const aiLimiter = rateLimit({
   windowMs: 60 * 1000,        // 1-minute rolling window
@@ -25,9 +25,9 @@ export const aiLimiter = rateLimit({
   standardHeaders: 'draft-7', // Emit RFC-compliant RateLimit-* response headers
   legacyHeaders: false,       // Suppress deprecated X-RateLimit-* headers
 
-  // Key by authenticated userId set by the protect middleware.
-  keyGenerator: (req: Request) =>
-    (req as any).userId ?? req.ip ?? 'anonymous',
+  // 👉 FIXED: Added 'res' to parameters and used ipKeyGenerator
+  keyGenerator: (req: Request, res: Response) =>
+    (req as any).userId ?? ipKeyGenerator(req, res) ?? 'anonymous',
 
   handler: (_req, res) => {
     res.status(429).json({
@@ -46,7 +46,7 @@ export const aiLimiter = rateLimit({
  * orphaned records or triggering excessive Stripe session creation.
  *
  * Applied to:
- *   POST /api/user/purchase-credits   → purchaseCredits
+ * POST /api/user/purchase-credits   → purchaseCredits
  */
 export const purchaseLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -54,8 +54,9 @@ export const purchaseLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
 
-  keyGenerator: (req: Request) =>
-    (req as any).userId ?? req.ip ?? 'anonymous',
+  // 👉 FIXED: Added 'res' to parameters and used ipKeyGenerator
+  keyGenerator: (req: Request, res: Response) =>
+    (req as any).userId ?? ipKeyGenerator(req, res) ?? 'anonymous',
 
   handler: (_req, res) => {
     res.status(429).json({

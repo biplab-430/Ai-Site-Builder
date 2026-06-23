@@ -9,25 +9,9 @@ import projectRouter from './routes/ProjectRoute.js';
 import { stripeWebhook } from './Controllers/StripeWebhook.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
-// ─── Security Headers (CS-05) ─────────────────────────────────────────────
-// Helmet sets a suite of well-known HTTP security headers in a single call.
-//
-// Overrides from the defaults:
-//   crossOriginResourcePolicy  : 'cross-origin' — lets the Vercel frontend
-//     fetch assets served from the Render API without CORP blocks.
-//   crossOriginEmbedderPolicy  : false — disabled because:
-//     a) Stripe Checkout embeds third-party iframes.
-//     b) The AI-generated site previews are cross-origin iframes by design.
-//   contentSecurityPolicy      : false on this API server — CSP is more
-//     meaningful on the HTML-serving frontend (Vercel) where user content
-//     is rendered. Enabling it here would require allow-listing every
-//     external AI / Pexels / Stripe domain used by generated pages.
-//
-// All other helmet defaults remain active, including:
-//   X-DNS-Prefetch-Control, X-Frame-Options (SAMEORIGIN), X-XSS-Protection,
-//   Strict-Transport-Security (HSTS), X-Content-Type-Options (noSniff),
-//   and X-Powered-By removal.
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
